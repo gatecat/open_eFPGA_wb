@@ -25,6 +25,7 @@ module eFPGA_top (
 	input [31:0] wbs_dat_i,
 	input [31:0] wbs_adr_i,
 	output [31:0] wbs_dat_o,
+	output wbs_ack_o,
 
 	// Logic Analyzer Signals
 	output [6:0] la_data_out,
@@ -170,7 +171,22 @@ module eFPGA_top (
 	end
 	
 	//to_wishbone
-	assign wbs_dat_o = {16'b0,from_fabric_ios};
+
+
+	// wb ack generation
+	wire cfg_wb_active = (wbs_adr_i[31:24] == 8'h30);
+	// fabric map regions selected
+	wire fab_wb_active = (wbs_adr_i[31:24] >= 8'h31 && wbs_adr_i[31:24] <= 8'h3F);
+	reg cfg_wb_ack;
+	always @(posedge wb_clk_i)
+		cfg_wb_ack <= cfg_wb_active && wbs_stb_i && wbs_cyc_i;
+	wire fab_wb_ack_o = FAB2RAM_D[32];
+	wire fab_wb_ack = fab_wb_ack_o && fab_wb_active;
+
+	assign wbs_ack_o = cfg_wb_ack || fab_wb_ack;
+
+	// Receive Wishbone data back from fabric via RAM IO
+	assign wbs_dat_o = fab_wb_active ? FAB2RAM_D[31:0] : {16'b0,from_fabric_ios};
 	assign read_ena = (wbs_adr_i == 32'h30000004)? (wbs_stb_i & wbs_cyc_i & ~wbs_we_i & ~wbs_stb_i) : 1'b0;
 	
 	my_mux2 from_fabric_io_0  (.A0(1'b0), .A1(I_top[0]),  .S(read_ena), .X(from_fabric_ios[0]));
@@ -210,6 +226,9 @@ module eFPGA_top (
 	my_mux2 to_fabric_addr  (.A0(io_in[23]), .A1(to_fabric_ios[16]), .S(B_config_C[32]), .X(O_top[16]));
 	
 	my_mux2 to_fabric_strobe(.A0(io_in[24]), .A1(fabric_strobe),     .S(A_config_C[32]), .X(O_top[17]));
+
+	// Pass wishbone signals into fabric via RAM-intended IO
+	assign RAM2FAB_D[63:0] = {fab_wb_active, wbs_stb_i, wbs_cyc_i, wbs_we_i, wbs_adr_i[27:0], wbs_dat_i};
 
 	assign external_clock = io_in[0];
 	assign clk_sel = {io_in[2],io_in[1]};
@@ -1167,6 +1186,9 @@ Config Config_inst (
 	.FrameStrobe(FrameSelect)
 	);
 
+// Bottom 2 RAMs replaced by WB IF
+
+/*
 	BlockRAM_1KB Inst_BlockRAM_0 (
 	.clk(CLK),
 	.rd_addr(FAB2RAM_A[7:0]),
@@ -1194,7 +1216,7 @@ Config Config_inst (
 	.C4(FAB2RAM_C[12]),
 	.C5(FAB2RAM_C[13])
 	);
-
+*/
 	BlockRAM_1KB Inst_BlockRAM_2 (
 	.clk(CLK),
 	.rd_addr(FAB2RAM_A[39:32]),

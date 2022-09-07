@@ -107,12 +107,16 @@ eFPGA_top inst_eFPGA_top (
 	.wbs_dat_i(wbs_dat_i),
 	.wbs_adr_i(wbs_adr_i),
 	.wbs_dat_o(wbs_dat_o),
+	.wbs_ack_o(wbs_ack_o),
 	.la_data_out(la_data_out[6:0]),
 	.io_in(io_in[37:7]),
 	.io_out(io_out[37:7]),
 	.io_oeb(io_oeb[37:7]),
 	.user_clock2(user_clock2)
 );
+
+assign io_oeb[6:0] = 7'b111111;
+assign io_out[6:0] = 7'b000000;
 
 endmodule	// user_project_wrapper
 
